@@ -1,7 +1,5 @@
-import React, { Component } from 'react';
-import { bindActionCreators } from 'redux';
-import { connect } from 'react-redux';
-import PropTypes from 'prop-types';
+import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 
 import * as CartActions from '../../store/modules/cart/actions';
 
@@ -23,85 +21,66 @@ import {
   ActionText,
 } from './styles';
 
-class Main extends Component {
-  static propTypes = {
-    addToCartRequest: PropTypes.func.isRequired,
-    amount: PropTypes.objectOf(PropTypes.number).isRequired,
-  };
+export default function Main() {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  state = {
-    products: [],
-    loading: true,
-  };
+  const amount = useSelector(state =>
+    state.cart.reduce((sumAmount, product) => {
+      // eslint-disable-next-line no-param-reassign
+      sumAmount[product.id] = product.amount;
 
-  async componentDidMount() {
-    const { products } = this.state;
+      return sumAmount;
+    }, {})
+  );
+  const dispatch = useDispatch();
 
-    this.setState({ loading: true });
+  useEffect(() => {
+    async function fetchProducts() {
+      setLoading(true);
 
-    const response = await api.get('/products');
+      const response = await api.get('/products');
 
-    const data = response.data.map(product => ({
-      ...product,
-      formattedPrice: formatPrice(product.price),
-    }));
+      const data = response.data.map(product => ({
+        ...product,
+        formattedPrice: formatPrice(product.price),
+      }));
 
-    this.setState({
-      products: products.length ? [...products, data] : data,
-      loading: false,
-    });
+      setProducts(data);
+      setLoading(false);
+    }
+
+    fetchProducts();
+  }, []);
+
+  function handleAddProductToCart(id) {
+    dispatch(CartActions.addToCartRequest(id));
   }
 
-  handleAddProductToCart = id => {
-    const { addToCartRequest } = this.props;
-    addToCartRequest(id);
-  };
-
-  render() {
-    const { products, loading } = this.state;
-    const { amount } = this.props;
-    return (
-      <Container>
-        {loading ? (
-          <ActivityIndicator />
-        ) : (
-          <List
-            data={products}
-            keyExtractor={product => String(product.id)}
-            renderItem={({ item }) => (
-              <ProductItem>
-                <ProductImage source={{ uri: item.image }} />
-                <ProductTitle>{item.title}</ProductTitle>
-                <ProductPrice>{item.formattedPrice}</ProductPrice>
-                <AddButton onPress={() => this.handleAddProductToCart(item.id)}>
-                  <AmountContainer>
-                    <AddShoppingCartIcon />
-                    <AmountText>{amount[item.id] || 0}</AmountText>
-                  </AmountContainer>
-                  <ActionText>ADD TO CART</ActionText>
-                </AddButton>
-              </ProductItem>
-            )}
-          />
-        )}
-      </Container>
-    );
-  }
+  return (
+    <Container>
+      {loading ? (
+        <ActivityIndicator />
+      ) : (
+        <List
+          data={products}
+          keyExtractor={product => String(product.id)}
+          renderItem={({ item }) => (
+            <ProductItem>
+              <ProductImage source={{ uri: item.image }} />
+              <ProductTitle>{item.title}</ProductTitle>
+              <ProductPrice>{item.formattedPrice}</ProductPrice>
+              <AddButton onPress={() => handleAddProductToCart(item.id)}>
+                <AmountContainer>
+                  <AddShoppingCartIcon />
+                  <AmountText>{amount[item.id] || 0}</AmountText>
+                </AmountContainer>
+                <ActionText>ADD TO CART</ActionText>
+              </AddButton>
+            </ProductItem>
+          )}
+        />
+      )}
+    </Container>
+  );
 }
-
-const mapStateToProps = state => ({
-  amount: state.cart.reduce((amount, product) => {
-    // eslint-disable-next-line no-param-reassign
-    amount[product.id] = product.amount;
-
-    return amount;
-  }, {}),
-});
-
-const mapDispatchToProps = dispatch =>
-  bindActionCreators(CartActions, dispatch);
-
-export default connect(
-  mapStateToProps,
-  mapDispatchToProps
-)(Main);
